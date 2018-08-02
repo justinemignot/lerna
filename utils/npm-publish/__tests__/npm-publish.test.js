@@ -21,7 +21,7 @@ describe("npm-publish", () => {
 
     expect(ChildProcessUtilities.exec).lastCalledWith(
       "npm",
-      ["publish", "--ignore-scripts", "--tag", "published-tag"],
+      ["publish", "test-1.10.100.tgz", "--tag", "published-tag"],
       {
         cwd: pkg.location,
         env: {
@@ -35,7 +35,7 @@ describe("npm-publish", () => {
   it("does not pass --tag when none present (npm default)", async () => {
     await npmPublish(pkg, undefined, { npmClient: "npm" });
 
-    expect(ChildProcessUtilities.exec).lastCalledWith("npm", ["publish", "--ignore-scripts"], {
+    expect(ChildProcessUtilities.exec).lastCalledWith("npm", ["publish", "test-1.10.100.tgz"], {
       cwd: pkg.location,
       env: {},
       pkg,
@@ -47,7 +47,7 @@ describe("npm-publish", () => {
 
     expect(ChildProcessUtilities.exec).lastCalledWith(
       "npm",
-      ["publish", "--ignore-scripts", "--tag", "trailing-tag"],
+      ["publish", "test-1.10.100.tgz", "--tag", "trailing-tag"],
       {
         cwd: pkg.location,
         env: {},
@@ -63,7 +63,7 @@ describe("npm-publish", () => {
 
     expect(ChildProcessUtilities.exec).lastCalledWith(
       "npm",
-      ["publish", "--ignore-scripts", "--tag", "custom-registry"],
+      ["publish", "test-1.10.100.tgz", "--tag", "custom-registry"],
       {
         cwd: pkg.location,
         env: {
@@ -82,7 +82,7 @@ describe("npm-publish", () => {
         "yarn",
         [
           "publish",
-          "--ignore-scripts",
+          "test-1.10.100.tgz",
           "--tag",
           "yarn-publish",
           "--new-version",

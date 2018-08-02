@@ -25,6 +25,10 @@ const getTaggedPackages = require("./lib/get-tagged-packages");
 const getPackagesWithoutLicense = require("./lib/get-packages-without-license");
 const gitCheckout = require("./lib/git-checkout");
 const removeTempLicenses = require("./lib/remove-temp-licenses");
+const verifyNpmRegistry = require("./lib/verify-npm-registry");
+const verifyNpmPackageAccess = require("./lib/verify-npm-package-access");
+const getTwoFactorAuthRequired = require("./lib/get-two-factor-auth-required");
+const promptOneTimePassword = require("./lib/prompt-one-time-password");
 
 module.exports = factory;
 
@@ -89,7 +93,9 @@ class PublishCommand extends Command {
           )
         : [this.packagesToPublish];
 
-      return Promise.resolve().then(() => this.prepareLicenseActions());
+      return Promise.resolve()
+        .then(() => this.prepareRegistryActions())
+        .then(() => this.prepareLicenseActions());
     });
   }
 
@@ -232,6 +238,16 @@ class PublishCommand extends Command {
       });
   }
 
+  prepareRegistryActions() {
+    return Promise.resolve()
+      .then(() => verifyNpmRegistry(this.project.rootPath, this.npmConfig))
+      .then(() => verifyNpmPackageAccess(this.packagesToPublish, this.project.rootPath, this.npmConfig))
+      .then(() => getTwoFactorAuthRequired(this.project.rootPath, this.npmConfig))
+      .then(isRequired => {
+        this.twoFactorAuthRequired = isRequired;
+      });
+  }
+
   updateCanaryVersions() {
     const publishableUpdates = this.updates.filter(node => !node.pkg.private);
 
@@ -328,44 +344,67 @@ class PublishCommand extends Command {
       });
   }
 
+  requestOneTimePassword() {
+    return Promise.resolve()
+      .then(() => promptOneTimePassword())
+      .then(otp => {
+        this.npmConfig.otp = otp;
+      });
+  }
+
   npmPublish() {
-    const tracker = this.logger.newItem("npmPublish");
     // if we skip temp tags we should tag with the proper value immediately
     const distTag = this.options.tempTag ? "lerna-temp" : this.getDistTag();
+    const tracker = this.logger.newItem("npmPublish");
+
+    // two batched loops are run, pack _then_ publish
+    tracker.addWork(this.packagesToPublish.length * 2);
 
     let chain = Promise.resolve();
 
     chain = chain.then(() => createTempLicenses(this.project.licensePath, this.packagesToBeLicensed));
-
     chain = chain.then(() => this.runPrepublishScripts(this.project.manifest));
-    chain = chain.then(() =>
-      pMap(this.updates, ({ pkg }) => {
-        if (this.options.requireScripts) {
-          this.execScript(pkg, "prepublish");
-        }
 
-        return this.runPrepublishScripts(pkg);
-      })
+    if (this.options.requireScripts) {
+      // track completion of prepublish.js on _all_ updates
+      // and postpublish.js _only_ on public packages
+      tracker.addWork(this.updates.length + this.packagesToPublish.length);
+
+      chain = chain.then(() =>
+        pMap(this.updates, ({ pkg }) => {
+          this.execScript(pkg, "prepublish");
+          tracker.completeWork(1);
+        })
+      );
+    }
+
+    chain = chain.then(() =>
+      runParallelBatches(this.batchedPackages, this.concurrency, pkg =>
+        npmPublish.npmPack(pkg).then(tgzFile => {
+          pkg.tgzFile = tgzFile;
+          tracker.completeWork(1);
+        })
+      )
     );
 
-    tracker.addWork(this.packagesToPublish.length);
+    if (this.twoFactorAuthRequired) {
+      chain = chain.then(() => this.requestOneTimePassword());
+    }
 
-    const mapPackage = pkg => {
-      tracker.verbose("publishing", pkg.name);
+    chain = chain.then(() =>
+      runParallelBatches(this.batchedPackages, this.concurrency, pkg =>
+        npmPublish(pkg, distTag, this.npmConfig).then(() => {
+          tracker.info("published", pkg.name);
+          tracker.completeWork(1);
 
-      return npmPublish(pkg, distTag, this.npmConfig).then(() => {
-        tracker.info("published", pkg.name);
-        tracker.completeWork(1);
+          if (this.options.requireScripts) {
+            this.execScript(pkg, "postpublish");
+            tracker.completeWork(1);
+          }
+        })
+      )
+    );
 
-        if (this.options.requireScripts) {
-          this.execScript(pkg, "postpublish");
-        }
-
-        return this.runPackageLifecycle(pkg, "postpublish");
-      });
-    };
-
-    chain = chain.then(() => runParallelBatches(this.batchedPackages, this.concurrency, mapPackage));
     chain = chain.then(() => this.runPackageLifecycle(this.project.manifest, "postpublish"));
     chain = chain.then(() => removeTempLicenses(this.packagesToBeLicensed));
 

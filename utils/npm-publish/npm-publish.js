@@ -9,11 +9,11 @@ module.exports = npmPublish;
 module.exports.npmPack = npmPack;
 
 function npmPublish(pkg, tag, { npmClient, registry, otp }) {
-  log.silly("npmPublish", tag, pkg.name);
+  log.verbose("publish", pkg.name);
 
   const distTag = tag && tag.trim();
   const opts = getExecOpts(pkg, registry, otp);
-  const args = ["publish", "--ignore-scripts"];
+  const args = ["publish", pkg.tarball];
 
   if (distTag) {
     args.push("--tag", distTag);

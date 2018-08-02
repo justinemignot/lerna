@@ -2,6 +2,9 @@
 
 // local modules _must_ be explicitly mocked
 jest.mock("../lib/get-packages-without-license");
+jest.mock("../lib/get-two-factor-auth-required.js");
+jest.mock("../lib/verify-npm-package-access.js");
+jest.mock("../lib/verify-npm-registry.js");
 // FIXME: better mock for version command
 jest.mock("../../version/lib/git-push");
 jest.mock("../../version/lib/is-anything-committed");
@@ -22,13 +25,16 @@ describe("lifecycle scripts", () => {
 
     await lernaPublish(cwd)();
 
-    expect(runLifecycle).toHaveBeenCalledTimes(12);
-
     ["prepare", "prepublishOnly", "postpublish"].forEach(script => {
       // "lifecycle" is the root manifest name
       expect(runLifecycle).toHaveBeenCalledWith(expect.objectContaining({ name: "lifecycle" }), script);
-      expect(runLifecycle).toHaveBeenCalledWith(expect.objectContaining({ name: "package-1" }), script);
     });
+
+    // all leaf package lifecycles are called by npm pack
+    expect(runLifecycle).not.toHaveBeenCalledWith(
+      expect.objectContaining({ name: "package-1" }),
+      expect.stringMatching(/(prepare|prepublishOnly|postpublish)/)
+    );
 
     // package-2 lacks version lifecycle scripts
     expect(runLifecycle).not.toHaveBeenCalledWith(
@@ -47,9 +53,6 @@ describe("lifecycle scripts", () => {
       // publish-specific
       ["lifecycle", "prepare"],
       ["lifecycle", "prepublishOnly"],
-      ["package-1", "prepare"],
-      ["package-1", "prepublishOnly"],
-      ["package-1", "postpublish"],
       ["lifecycle", "postpublish"],
     ]);
   });

@@ -5,6 +5,9 @@ jest.unmock("@lerna/collect-updates");
 
 // local modules _must_ be explicitly mocked
 jest.mock("../lib/get-packages-without-license");
+jest.mock("../lib/get-two-factor-auth-required.js");
+jest.mock("../lib/verify-npm-package-access.js");
+jest.mock("../lib/verify-npm-registry.js");
 
 const fs = require("fs-extra");
 const path = require("path");
