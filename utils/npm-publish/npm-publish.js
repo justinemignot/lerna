@@ -7,11 +7,11 @@ const getExecOpts = require("@lerna/get-npm-exec-opts");
 
 module.exports = npmPublish;
 
-function npmPublish(pkg, tag, { npmClient, registry }) {
+function npmPublish(pkg, tag, { npmClient, registry, otp }) {
   log.silly("npmPublish", tag, pkg.name);
 
   const distTag = tag && tag.trim();
-  const opts = getExecOpts(pkg, registry);
+  const opts = getExecOpts(pkg, registry, otp);
   const args = ["publish", "--ignore-scripts"];
 
   if (distTag) {
