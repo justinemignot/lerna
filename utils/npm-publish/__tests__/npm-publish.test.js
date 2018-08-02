@@ -5,26 +5,28 @@ jest.mock("@lerna/child-process");
 // mocked modules
 const ChildProcessUtilities = require("@lerna/child-process");
 
+// helpers
+const Package = require("@lerna/package");
+
 // file under test
 const npmPublish = require("..");
 
 describe("npm-publish", () => {
   ChildProcessUtilities.exec.mockResolvedValue();
 
-  const pkg = {
-    name: "test",
-    location: "/test/npmPublish",
-    version: "1.10.100",
-  };
+  const pkg = new Package({ name: "test", version: "1.10.100" }, "/test/npmPublish");
 
   it("runs npm publish in a directory with --tag support", async () => {
-    await npmPublish(pkg, "published-tag", { npmClient: "npm" });
+    await npmPublish(pkg, "published-tag", { npmClient: "npm", otp: "12345" });
 
     expect(ChildProcessUtilities.exec).lastCalledWith(
       "npm",
       ["publish", "--ignore-scripts", "--tag", "published-tag"],
       {
         cwd: pkg.location,
+        env: {
+          npm_config_otp: "12345",
+        },
         pkg,
       }
     );
@@ -35,6 +37,7 @@ describe("npm-publish", () => {
 
     expect(ChildProcessUtilities.exec).lastCalledWith("npm", ["publish", "--ignore-scripts"], {
       cwd: pkg.location,
+      env: {},
       pkg,
     });
   });
@@ -47,6 +50,7 @@ describe("npm-publish", () => {
       ["publish", "--ignore-scripts", "--tag", "trailing-tag"],
       {
         cwd: pkg.location,
+        env: {},
         pkg,
       }
     );
@@ -62,10 +66,9 @@ describe("npm-publish", () => {
       ["publish", "--ignore-scripts", "--tag", "custom-registry"],
       {
         cwd: pkg.location,
-        env: expect.objectContaining({
+        env: {
           npm_config_registry: registry,
-        }),
-        extendEnv: false,
+        },
         pkg,
       }
     );
@@ -88,6 +91,7 @@ describe("npm-publish", () => {
         ],
         {
           cwd: pkg.location,
+          env: {},
           pkg,
         }
       );
