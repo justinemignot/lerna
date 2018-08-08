@@ -54,8 +54,8 @@ function collectUpdates(filteredPackages, packageGraph, execOpts, commandOptions
     });
   }
 
-  const dependents = collectDependents(candidates);
-  dependents.forEach(node => candidates.add(node));
+  //const dependents = collectDependents(candidates);
+  //dependents.forEach(node => candidates.add(node));
 
   // The result should always be in the same order as the input
   const updates = [];
